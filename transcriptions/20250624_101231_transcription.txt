@@ -1,0 +1,8 @@
+Session ID: simulation_session_1750741947
+Confidence: 0.9400000000000001
+Service: Browser Speech Recognition
+Transcription Time: 2025-06-24T10:12:31.728758
+Word Count: 8
+Character Count: 42
+Transcription:
+This is the second phrase with more words.
