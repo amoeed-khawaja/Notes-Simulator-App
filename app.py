@@ -18,6 +18,14 @@ except ImportError:
     SPEECHBRAIN_AVAILABLE = False
     print("⚠️  SpeechBrain not installed. Install with: pip install speechbrain")
 
+# Audio processing imports
+try:
+    from pydub import AudioSegment
+    AUDIO_CONVERSION_AVAILABLE = True
+except ImportError:
+    AUDIO_CONVERSION_AVAILABLE = False
+    print("⚠️  pydub not installed. Install with: pip install pydub")
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -57,6 +65,34 @@ def load_speechbrain_model():
         logger.error(f"❌ Failed to load SpeechBrain model: {e}")
         return False
 
+def convert_audio_format(input_path, output_format='wav'):
+    """
+    Convert audio file to a format that SpeechBrain can handle
+    """
+    if not AUDIO_CONVERSION_AVAILABLE:
+        logger.warning("Audio conversion not available, using original file")
+        return input_path
+    
+    try:
+        logger.info(f"🔄 Converting audio to {output_format} format...")
+        
+        # Load audio file
+        audio = AudioSegment.from_file(input_path)
+        
+        # Create output path
+        output_path = tempfile.mktemp(suffix=f'.{output_format}')
+        
+        # Export to new format
+        audio.export(output_path, format=output_format)
+        
+        logger.info(f"✅ Audio converted to: {output_path}")
+        return output_path
+        
+    except Exception as e:
+        logger.error(f"❌ Audio conversion failed: {e}")
+        logger.warning("Using original file format")
+        return input_path
+
 @app.route('/health', methods=['GET'])
 def health_check():
     logger.info("Health check endpoint called")
@@ -80,7 +116,7 @@ def transcribe_with_speechbrain(audio_file_path):
             logger.error("SpeechBrain model not loaded")
             raise Exception("SpeechBrain model not available")
         
-        # Ensure the file path is absolute and properly formatted
+        # Ensure we have a clean absolute path
         audio_file_path = os.path.abspath(audio_file_path)
         logger.info(f"🧠 Audio file path: {audio_file_path}")
         
@@ -88,7 +124,28 @@ def transcribe_with_speechbrain(audio_file_path):
         if not os.path.exists(audio_file_path):
             raise Exception(f"Audio file not found: {audio_file_path}")
         
+        # Get file size for debugging
+        file_size = os.path.getsize(audio_file_path)
+        logger.info(f"🧠 Audio file size: {file_size} bytes")
+        
+        # Get current working directory for debugging
+        cwd = os.getcwd()
+        logger.info(f"🧠 Current working directory: {cwd}")
+        
+        # Check if the path is absolute
+        is_absolute = os.path.isabs(audio_file_path)
+        logger.info(f"🧠 Is absolute path: {is_absolute}")
+        
+        # List directory contents for debugging
+        try:
+            dir_path = os.path.dirname(audio_file_path)
+            dir_contents = os.listdir(dir_path)
+            logger.info(f"🧠 Directory contents: {dir_contents[:10]}...")  # Show first 10 items
+        except Exception as dir_error:
+            logger.warning(f"🧠 Could not list directory contents: {dir_error}")
+        
         # Transcribe audio using SpeechBrain
+        logger.info("🧠 Calling SpeechBrain transcribe_file...")
         transcription = speechbrain_model.transcribe_file(audio_file_path)
         
         logger.info(f"✅ SpeechBrain transcription completed: {transcription}")
@@ -96,6 +153,8 @@ def transcribe_with_speechbrain(audio_file_path):
         
     except Exception as e:
         logger.error(f"❌ SpeechBrain transcription error: {e}")
+        logger.error(f"❌ Error type: {type(e).__name__}")
+        logger.error(f"❌ Error details: {str(e)}")
         raise e
 
 def transcribe_with_google_fallback(audio_file_path):
@@ -166,11 +225,13 @@ def transcribe_audio():
         
         # Create temporary file for transcription
         logger.info("Creating temporary audio file...")
-        temp_file_path = tempfile.mktemp(suffix=f'.{audio_format}')
-        with open(temp_file_path, 'wb') as temp_file:
+        # Use NamedTemporaryFile for better control
+        with tempfile.NamedTemporaryFile(suffix=f'.{audio_format}', delete=False) as temp_file:
             temp_file.write(decoded_audio)
+            temp_file_path = temp_file.name
         
         logger.info(f"Temporary file created: {temp_file_path}")
+        logger.info(f"Temporary file absolute path: {os.path.abspath(temp_file_path)}")
         
         try:
             # Use SpeechBrain for transcription
@@ -178,8 +239,25 @@ def transcribe_audio():
             logger.info(f"Using transcription service: {transcription_service}")
             
             if transcription_service == 'speechbrain' and speechbrain_model:
-                transcription_text = transcribe_with_speechbrain(temp_file_path)
+                logger.info("🧠 Attempting SpeechBrain transcription...")
+                
+                # Convert audio to WAV format for better SpeechBrain compatibility
+                if audio_format.lower() != 'wav':
+                    logger.info("🔄 Converting audio to WAV format for SpeechBrain...")
+                    wav_file_path = convert_audio_format(temp_file_path, 'wav')
+                    transcription_text = transcribe_with_speechbrain(wav_file_path)
+                    
+                    # Clean up converted file
+                    try:
+                        if wav_file_path != temp_file_path:
+                            os.unlink(wav_file_path)
+                            logger.info("✅ Converted audio file cleaned up")
+                    except Exception as cleanup_error:
+                        logger.warning(f"⚠️ Failed to clean up converted file: {cleanup_error}")
+                else:
+                    transcription_text = transcribe_with_speechbrain(temp_file_path)
             else:
+                logger.info("🔄 Using Google Speech Recognition fallback...")
                 # Fallback to Google Speech Recognition
                 transcription_text = transcribe_with_google_fallback(temp_file_path)
                 transcription_service = 'google_fallback'
@@ -190,8 +268,8 @@ def transcribe_audio():
                 'transcription': transcription_text,
                 'audio_size': len(decoded_audio),
                 'service': transcription_service,
-                'word_count': len(transcription_text.split()),
-                'character_count': len(transcription_text)
+                'word_count': len(str(transcription_text).split()),
+                'character_count': len(str(transcription_text))
             }
             
             transcription_results.append(transcription_result)
@@ -301,8 +379,8 @@ def save_transcription():
             'session_id': session_id,
             'confidence': confidence,
             'service': 'browser_speech_recognition',
-            'word_count': len(transcription_text.split()),
-            'character_count': len(transcription_text)
+            'word_count': len(str(transcription_text).split()),
+            'character_count': len(str(transcription_text))
         }
         
         transcription_results.append(transcription_result)
