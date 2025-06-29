@@ -34,6 +34,7 @@ Transcription Results
 - Expo CLI
 - React Native development environment
 - Modern browser with Speech Recognition support (Chrome, Edge, Safari)
+- FFmpeg for audio conversion (required for M4A support)
 
 ## Installation
 
@@ -71,6 +72,79 @@ This script will:
 - Test Flask server connectivity
 - Update the React Native app configuration
 - Provide setup instructions
+
+### Installing FFmpeg
+
+FFmpeg is required for audio format conversion (M4A to WAV). Install it based on your operating system:
+
+#### Windows
+
+```bash
+# Using Chocolatey
+choco install ffmpeg
+
+# Using Scoop
+scoop install ffmpeg
+
+# Or download from https://ffmpeg.org/download.html
+```
+
+#### macOS
+
+```bash
+# Using Homebrew
+brew install ffmpeg
+```
+
+#### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt update
+sudo apt install ffmpeg
+```
+
+#### Linux (CentOS/RHEL)
+
+```bash
+sudo yum install ffmpeg
+# or
+sudo dnf install ffmpeg
+```
+
+### Backend Setup
+
+1. **Set up OpenAI Whisper (Recommended):**
+
+   - Get a Replicate API key from [replicate.com](https://replicate.com)
+   - Set environment variable: `export REPLICATE_API_TOKEN=your_api_key`
+   - See [REPLICATE_SETUP.md](REPLICATE_SETUP.md) for detailed instructions
+
+2. **Set up SpeechBrain (Optional):**
+
+   - SpeechBrain will automatically download models on first use
+   - Models are cached in `./pretrained_models/`
+
+3. **Start the Flask server:**
+
+```bash
+python app.py
+```
+
+The server will run on `http://localhost:5000`
+
+### Frontend Setup
+
+1. **Start the React Native app:**
+
+```bash
+cd NotesSimmulator
+npx expo start
+```
+
+2. **Run on device/simulator:**
+   - Scan QR code with Expo Go app (mobile)
+   - Press 'i' for iOS simulator
+   - Press 'a' for Android emulator
 
 ## Usage
 

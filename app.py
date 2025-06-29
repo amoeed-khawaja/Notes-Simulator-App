@@ -26,6 +26,14 @@ except ImportError:
     AUDIO_CONVERSION_AVAILABLE = False
     print("⚠️  pydub not installed. Install with: pip install pydub")
 
+# Replicate imports for OpenAI Whisper
+try:
+    import replicate
+    REPLICATE_AVAILABLE = True
+except ImportError:
+    REPLICATE_AVAILABLE = False
+    print("⚠️  replicate not installed. Install with: pip install replicate")
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -76,6 +84,10 @@ def convert_audio_format(input_path, output_format='wav'):
     try:
         logger.info(f"🔄 Converting audio to {output_format} format...")
         
+        # Check if input file exists
+        if not os.path.exists(input_path):
+            raise Exception(f"Input file not found: {input_path}")
+        
         # Load audio file
         audio = AudioSegment.from_file(input_path)
         
@@ -85,25 +97,29 @@ def convert_audio_format(input_path, output_format='wav'):
         # Export to new format
         audio.export(output_path, format=output_format)
         
-        logger.info(f"✅ Audio converted to: {output_path}")
+        # Verify the output file was created
+        if not os.path.exists(output_path):
+            raise Exception(f"Output file was not created: {output_path}")
+        
+        # Check file size
+        output_size = os.path.getsize(output_path)
+        if output_size == 0:
+            raise Exception(f"Output file is empty: {output_path}")
+        
+        logger.info(f"✅ Audio converted to: {output_path} ({output_size} bytes)")
         return output_path
         
     except Exception as e:
         logger.error(f"❌ Audio conversion failed: {e}")
-        logger.warning("Using original file format")
-        return input_path
-
-@app.route('/health', methods=['GET'])
-def health_check():
-    logger.info("Health check endpoint called")
-    return jsonify({
-        'status': 'healthy',
-        'message': 'Flask server is running with SpeechBrain transcription',
-        'speechbrain_available': SPEECHBRAIN_AVAILABLE,
-        'model_loaded': speechbrain_model is not None,
-        'transcription_count': len(transcription_results),
-        'timestamp': datetime.now().isoformat()
-    })
+        logger.warning("⚠️ Using original file format for transcription")
+        
+        # If the original file exists, return it
+        if os.path.exists(input_path):
+            logger.info(f"🔄 Falling back to original file: {input_path}")
+            return input_path
+        else:
+            # If even the original file doesn't exist, this is a critical error
+            raise Exception(f"Both conversion and original file failed: {e}")
 
 def transcribe_with_speechbrain(audio_file_path):
     """
@@ -179,10 +195,83 @@ def transcribe_with_google_fallback(audio_file_path):
         logger.error(f"❌ Google fallback transcription failed: {e}")
         raise e
 
+def transcribe_with_openai_whisper(audio_file_path):
+    """
+    Transcribe audio using OpenAI Whisper via Replicate API
+    """
+    if not REPLICATE_AVAILABLE:
+        logger.error("Replicate not available")
+        raise Exception("Replicate API not available")
+    
+    try:
+        logger.info("🤖 Using OpenAI Whisper for transcription...")
+        
+        # Check if file exists
+        if not os.path.exists(audio_file_path):
+            raise Exception(f"Audio file not found: {audio_file_path}")
+        
+        # Get file size for debugging
+        file_size = os.path.getsize(audio_file_path)
+        logger.info(f"🤖 Audio file size: {file_size} bytes")
+        logger.info(f"🤖 Audio file path: {audio_file_path}")
+        
+        # Verify it's a WAV file (should be converted by endpoint)
+        if not audio_file_path.lower().endswith('.wav'):
+            logger.warning(f"⚠️ Audio file is not WAV format: {audio_file_path}")
+        
+        # Open the audio file for Replicate
+        with open(audio_file_path, 'rb') as audio_file:
+            logger.info("🤖 Sending WAV audio to OpenAI Whisper via Replicate...")
+            
+            # Run OpenAI Whisper model
+            output = replicate.run(
+                "openai/whisper:8099696689d249cf8b122d833c36ac3f75505c666a395ca40ef26f68e7d3d16e",
+                input={"audio": audio_file}
+            )
+            
+            logger.info(f"✅ OpenAI Whisper transcription completed")
+            
+            # Extract transcription text from output
+            if isinstance(output, dict) and 'segments' in output:
+                # If output has segments, concatenate all text
+                transcription_text = ' '.join([segment.get('text', '').strip() for segment in output['segments']])
+            elif isinstance(output, str):
+                # If output is directly a string
+                transcription_text = output
+            else:
+                # Fallback: try to extract text from any format
+                transcription_text = str(output)
+            
+            logger.info(f"🤖 Transcription: {transcription_text}")
+            
+            return transcription_text.strip()
+        
+    except Exception as e:
+        logger.error(f"❌ OpenAI Whisper transcription error: {e}")
+        logger.error(f"❌ Error type: {type(e).__name__}")
+        logger.error(f"❌ Error details: {str(e)}")
+        raise e
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    logger.info("Health check endpoint called")
+    return jsonify({
+        'status': 'healthy',
+        'message': 'Flask server is running with OpenAI Whisper transcription',
+        'speechbrain_available': SPEECHBRAIN_AVAILABLE,
+        'replicate_available': REPLICATE_AVAILABLE,
+        'model_loaded': speechbrain_model is not None,
+        'transcription_count': len(transcription_results),
+        'timestamp': datetime.now().isoformat()
+    })
+
 @app.route('/transcribe-audio', methods=['POST'])
 def transcribe_audio():
-    """Transcribe audio files using SpeechBrain"""
-    logger.info("=== SPEECHBRAIN TRANSCRIPTION REQUEST STARTED ===")
+    """Transcribe audio files using OpenAI Whisper"""
+    logger.info("=== OPENAI WHISPER TRANSCRIPTION REQUEST STARTED ===")
+    
+    # Track all temporary files for cleanup
+    temp_files_to_cleanup = []
     
     try:
         # Check if request is JSON
@@ -223,44 +312,136 @@ def transcribe_audio():
                 'message': 'Invalid base64 audio data'
             }), 400
         
-        # Create temporary file for transcription
-        logger.info("Creating temporary audio file...")
-        # Use NamedTemporaryFile for better control
-        with tempfile.NamedTemporaryFile(suffix=f'.{audio_format}', delete=False) as temp_file:
-            temp_file.write(decoded_audio)
-            temp_file_path = temp_file.name
-        
-        logger.info(f"Temporary file created: {temp_file_path}")
-        logger.info(f"Temporary file absolute path: {os.path.abspath(temp_file_path)}")
+        # Create temporary files for transcription
+        logger.info("Creating temporary audio files for transcription...")
+        temp_file_path = None
+        wav_file_path = None
+        transcription_file_path = None
         
         try:
-            # Use SpeechBrain for transcription
-            transcription_service = data.get('service', 'speechbrain')
+            # Create temporary file with original format first
+            with tempfile.NamedTemporaryFile(suffix=f'.{audio_format}', delete=False) as temp_file:
+                temp_file.write(decoded_audio)
+                temp_file_path = temp_file.name
+                temp_files_to_cleanup.append(temp_file_path)
+            
+            logger.info(f"Temporary file created: {temp_file_path}")
+            logger.info(f"Temporary file absolute path: {os.path.abspath(temp_file_path)}")
+            
+            # Convert to WAV format for optimal Whisper performance
+            if audio_format.lower() != 'wav':
+                logger.info("🔄 Converting audio to WAV format for optimal Whisper performance...")
+                try:
+                    wav_file_path = convert_audio_format(temp_file_path, 'wav')
+                    if wav_file_path != temp_file_path:  # Only add if it's a new file
+                        temp_files_to_cleanup.append(wav_file_path)
+                    transcription_file_path = wav_file_path
+                    logger.info(f"WAV file created: {wav_file_path}")
+                except Exception as conversion_error:
+                    logger.error(f"❌ Audio conversion failed: {conversion_error}")
+                    logger.warning("⚠️ Using original file format for transcription")
+                    transcription_file_path = temp_file_path
+            else:
+                transcription_file_path = temp_file_path
+                wav_file_path = None
+                
+        except Exception as e:
+            logger.error(f"Failed to create temporary audio file: {e}")
+            return jsonify({
+                'status': 'error',
+                'message': f'Failed to process audio file: {str(e)}'
+            }), 500
+        
+        # Verify transcription file exists before proceeding
+        if not os.path.exists(transcription_file_path):
+            logger.error(f"Transcription file does not exist: {transcription_file_path}")
+            return jsonify({
+                'status': 'error',
+                'message': f'Transcription file not found: {transcription_file_path}'
+            }), 500
+        
+        logger.info(f"✅ Transcription file verified: {transcription_file_path}")
+        
+        try:
+            # Determine transcription service to use
+            transcription_service = data.get('service', 'openai_whisper')
             logger.info(f"Using transcription service: {transcription_service}")
             
-            if transcription_service == 'speechbrain' and speechbrain_model:
-                logger.info("🧠 Attempting SpeechBrain transcription...")
-                
-                # Convert audio to WAV format for better SpeechBrain compatibility
-                if audio_format.lower() != 'wav':
-                    logger.info("🔄 Converting audio to WAV format for SpeechBrain...")
-                    wav_file_path = convert_audio_format(temp_file_path, 'wav')
-                    transcription_text = transcribe_with_speechbrain(wav_file_path)
+            transcription_text = None
+            
+            # Check if Replicate API token is available
+            replicate_token_available = os.environ.get('REPLICATE_API_TOKEN') is not None
+            if not replicate_token_available:
+                logger.warning("⚠️ REPLICATE_API_TOKEN not set - OpenAI Whisper will be skipped")
+            
+            # Try OpenAI Whisper first (only if token is available)
+            if transcription_service == 'openai_whisper' and REPLICATE_AVAILABLE and replicate_token_available:
+                try:
+                    logger.info("🤖 Using OpenAI Whisper for transcription...")
+                    transcription_text = transcribe_with_openai_whisper(transcription_file_path)
+                    transcription_service = 'openai_whisper'
+                except Exception as whisper_error:
+                    logger.error(f"❌ OpenAI Whisper failed: {whisper_error}")
+                    logger.info("🔄 Falling back to other services...")
+            elif transcription_service == 'openai_whisper' and not replicate_token_available:
+                logger.warning("⚠️ Skipping OpenAI Whisper - API token not configured")
+                logger.info("🔄 Falling back to other services...")
+            
+            # Try SpeechBrain if Whisper failed or was not requested
+            if transcription_text is None and speechbrain_model:
+                try:
+                    logger.info("🧠 Using SpeechBrain for transcription...")
+                    # For SpeechBrain, we might need a different WAV conversion
+                    if audio_format.lower() != 'wav':
+                        logger.info("🔄 Converting audio to WAV format for SpeechBrain...")
+                        try:
+                            sb_wav_file_path = convert_audio_format(temp_file_path, 'wav')
+                            if sb_wav_file_path != temp_file_path:
+                                temp_files_to_cleanup.append(sb_wav_file_path)
+                            transcription_text = transcribe_with_speechbrain(sb_wav_file_path)
+                        except Exception as sb_conversion_error:
+                            logger.error(f"❌ SpeechBrain WAV conversion failed: {sb_conversion_error}")
+                            # Try with original file if conversion fails
+                            transcription_text = transcribe_with_speechbrain(temp_file_path)
+                    else:
+                        transcription_text = transcribe_with_speechbrain(temp_file_path)
+                    transcription_service = 'speechbrain'
+                except Exception as sb_error:
+                    logger.error(f"❌ SpeechBrain failed: {sb_error}")
+                    logger.info("🔄 Falling back to Google Speech Recognition...")
+            
+            # Try Google Speech Recognition as final fallback
+            if transcription_text is None:
+                try:
+                    logger.info("🔄 Using Google Speech Recognition fallback...")
+                    # Google Speech Recognition requires WAV format, so try to convert if needed
+                    google_audio_path = temp_file_path
+                    if audio_format.lower() != 'wav':
+                        logger.info("🔄 Converting audio to WAV format for Google Speech Recognition...")
+                        try:
+                            google_wav_file_path = convert_audio_format(temp_file_path, 'wav')
+                            if google_wav_file_path != temp_file_path:
+                                temp_files_to_cleanup.append(google_wav_file_path)
+                                google_audio_path = google_wav_file_path
+                        except Exception as google_conversion_error:
+                            logger.error(f"❌ Google Speech Recognition WAV conversion failed: {google_conversion_error}")
+                            logger.warning("⚠️ Trying Google Speech Recognition with original format...")
                     
-                    # Clean up converted file
-                    try:
-                        if wav_file_path != temp_file_path:
-                            os.unlink(wav_file_path)
-                            logger.info("✅ Converted audio file cleaned up")
-                    except Exception as cleanup_error:
-                        logger.warning(f"⚠️ Failed to clean up converted file: {cleanup_error}")
-                else:
-                    transcription_text = transcribe_with_speechbrain(temp_file_path)
-            else:
-                logger.info("🔄 Using Google Speech Recognition fallback...")
-                # Fallback to Google Speech Recognition
-                transcription_text = transcribe_with_google_fallback(temp_file_path)
-                transcription_service = 'google_fallback'
+                    transcription_text = transcribe_with_google_fallback(google_audio_path)
+                    transcription_service = 'google_fallback'
+                except Exception as google_error:
+                    logger.error(f"❌ Google Speech Recognition failed: {google_error}")
+                    
+                    # Provide helpful error message based on the failure
+                    if "Audio file could not be read as PCM WAV" in str(google_error):
+                        error_msg = "Audio format not supported. Please install FFmpeg for M4A support or record in WAV format."
+                    else:
+                        error_msg = "All transcription services failed. Please check your internet connection and try again."
+                    
+                    raise Exception(error_msg)
+            
+            if transcription_text is None:
+                raise Exception("No transcription service succeeded")
             
             # Store transcription in global variable
             transcription_result = {
@@ -283,7 +464,8 @@ def transcribe_audio():
             logger.info(f"Character count: {character_count}")
             
             # Save transcription to file
-            transcription_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_speechbrain_transcription.txt"
+            service_name = transcription_service.replace('_', '_')
+            transcription_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{service_name}_transcription.txt"
             transcription_path = os.path.join(TRANSCRIPTIONS_FOLDER, transcription_filename)
             
             with open(transcription_path, 'w', encoding='utf-8') as f:
@@ -321,13 +503,12 @@ def transcribe_audio():
                 'message': f'Speech recognition service error: {str(e)}'
             }), 500
         
-        finally:
-            # Clean up temporary file
-            try:
-                os.unlink(temp_file_path)
-                logger.info("Temporary file cleaned up")
-            except Exception as e:
-                logger.warning(f"Failed to clean up temporary file: {e}")
+        except Exception as transcription_error:
+            logger.error(f"All transcription services failed: {transcription_error}")
+            return jsonify({
+                'status': 'error',
+                'message': f'Transcription failed: {str(transcription_error)}'
+            }), 500
     
     except Exception as e:
         logger.error(f"Unexpected error during transcription: {str(e)}")
@@ -337,7 +518,19 @@ def transcribe_audio():
         }), 500
     
     finally:
-        logger.info("=== SPEECHBRAIN TRANSCRIPTION REQUEST COMPLETED ===")
+        # Clean up all temporary files at the very end
+        logger.info("🧹 Cleaning up temporary files...")
+        for temp_file in temp_files_to_cleanup:
+            try:
+                if temp_file and os.path.exists(temp_file):
+                    os.unlink(temp_file)
+                    logger.info(f"✅ Temporary file cleaned up: {temp_file}")
+                elif temp_file:
+                    logger.warning(f"⚠️ Temporary file already deleted: {temp_file}")
+            except Exception as cleanup_error:
+                logger.warning(f"⚠️ Failed to clean up temporary file {temp_file}: {cleanup_error}")
+        
+        logger.info("=== OPENAI WHISPER TRANSCRIPTION REQUEST COMPLETED ===")
 
 @app.route('/save-transcription', methods=['POST'])
 def save_transcription():

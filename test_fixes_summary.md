@@ -31,57 +31,113 @@ await Audio.setAudioModeAsync({
 });
 ```
 
-## 🧠 SpeechBrain Transcription Fixes
+## 🤖 OpenAI Whisper Transcription Implementation
 
 ### Problem
 
-- SpeechBrain was failing with file path errors like: `Error opening 'C:\\Users\\moeed\\OneDrive\\Desktop\\InterNova\\NotesSimmulator\\C:\\Users\\moeed\\AppData\\Local\\Temp\\tmpa6y6d__2.m4a'`
-- M4A format might not be fully supported by SpeechBrain
+- SpeechBrain was failing with file path errors and format compatibility issues
+- Need for higher accuracy transcription service
 
 ### Solution
 
-- **Improved temp file creation**: Changed from `tempfile.mktemp()` to `tempfile.NamedTemporaryFile()` for better control
-- **Enhanced path handling**: Added `os.path.abspath()` to ensure clean absolute paths
-- **Added audio format conversion**: Convert M4A to WAV format for better SpeechBrain compatibility
-- **Better debugging**: Added comprehensive logging to track file paths, sizes, and directory contents
-- **Added pydub dependency**: For audio format conversion
+- **Implemented OpenAI Whisper via Replicate API**: Added state-of-the-art speech recognition
+- **Automatic audio format conversion**: Converts M4A to WAV for optimal Whisper performance
+- **Multiple transcription options**: Whisper (best), SpeechBrain (local), Browser Speech (free)
+- **Enhanced error handling**: Better fallback options and user feedback
 
 ### Files Updated
 
-- `app.py` - Enhanced transcription function with better path handling and audio conversion
-- `requirements.txt` - Added pydub for audio conversion
+- `app.py` - Added OpenAI Whisper transcription via Replicate API
+- `requirements.txt` - Added replicate and pydub dependencies
+- `NotesSimmulator/AppPages/NewRecordingScreen.js` - Updated to use Whisper as default
+- `REPLICATE_SETUP.md` - Complete setup guide
+- `test_flask_fixes.py` - Updated tests to include Replicate API
 
 ### New Features
 
-- **Audio format conversion**: Automatically converts M4A to WAV for SpeechBrain
-- **Better error handling**: More detailed error messages and debugging information
-- **Automatic cleanup**: Converts and cleans up temporary files
+- **OpenAI Whisper**: State-of-the-art speech recognition with 99+ language support
+- **Automatic format conversion**: M4A to WAV conversion for optimal performance
+- **Multiple service options**: Whisper (best), SpeechBrain (local), Browser Speech (free)
+- **Better error handling**: Comprehensive fallback options
+- **Cost-effective**: ~$0.006 per minute of audio
+
+### Transcription Flow
+
+1. **Audio Recording**: App records audio in M4A format
+2. **Base64 Encoding**: Audio is encoded and sent to Flask server
+3. **Format Conversion**: Server converts M4A to WAV using pydub
+4. **Whisper API**: Audio is sent to OpenAI Whisper via Replicate
+5. **Result Processing**: Transcription text is extracted and returned
+6. **File Cleanup**: Temporary files are automatically cleaned up
 
 ## 🧪 Test Scripts Created
 
 1. **`test_audio_fixes.js`** - Tests audio configuration and file system operations
-2. **`test_flask_fixes.py`** - Tests Flask server fixes and transcription endpoint
-3. **`test_fixes_summary.md`** - This summary document
+2. **`test_flask_fixes.py`** - Tests Flask server, Replicate API, and transcription endpoint
+3. **`REPLICATE_SETUP.md`** - Complete setup guide for Replicate API
+4. **`test_fixes_summary.md`** - This summary document
 
 ## 🎯 Expected Results
 
 1. **Audio Playback**: Should now work without the "interruptionModeIOS was set to an invalid value" error
 2. **Loudspeaker**: Audio should play through the loudspeaker as intended
-3. **Transcription**: Should work without the double path error, with automatic format conversion
-4. **Better Debugging**: More detailed logs to help identify any remaining issues
+3. **Transcription**: High-quality transcription using OpenAI Whisper with automatic format conversion
+4. **Multiple Options**: Users can choose between Whisper (best), SpeechBrain (local), or Browser Speech (free)
+5. **Better Debugging**: More detailed logs to help identify any remaining issues
 
 ## 📋 Next Steps
 
-1. **Install new dependency**: Run `pip install pydub` or `pip install -r requirements.txt`
-2. **Test audio playback**: Try recording and playing back audio in the app
-3. **Test transcription**: Try transcribing audio to see if the path and format issues are resolved
-4. **Run test scripts**: Use the test scripts to verify everything is working
+1. **Install new dependencies**:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Set up Replicate API**:
+
+   - Get API token from [replicate.com](https://replicate.com/account/api-tokens)
+   - Set environment variable: `export REPLICATE_API_TOKEN=r8_your_token_here`
+
+3. **Test the fixes**:
+
+   - Try recording and playing back audio - it should now work without errors
+   - Audio should play through the **loudspeaker** (bottom speaker) not the earpiece
+   - Try transcription with OpenAI Whisper - should provide high-quality results
+
+4. **Run test scripts**:
+   ```bash
+   python test_flask_fixes.py
+   ```
+
+## 💰 Cost Information
+
+### Replicate Free Tier
+
+- **1000 predictions per month** (free)
+- **Whisper model**: ~$0.006 per minute of audio
+- **No credit card required** for free tier
+
+### Usage Examples
+
+- 1 minute audio ≈ $0.006
+- 10 minutes audio ≈ $0.06
+- 100 minutes audio ≈ $0.60
 
 ## 🔍 Troubleshooting
 
 If issues persist:
 
 1. Check the Flask server logs for detailed debugging information
-2. Verify that pydub is installed: `pip list | grep pydub`
-3. Check that the audio files are being created and converted properly
-4. Look for any remaining path issues in the logs
+2. Verify that replicate and pydub are installed: `pip list | grep replicate`
+3. Ensure REPLICATE_API_TOKEN is set correctly
+4. Check that the audio files are being created and converted properly
+5. Look for any remaining path issues in the logs
+
+## 📊 Performance Comparison
+
+| Service            | Accuracy   | Speed    | Cost       | Offline |
+| ------------------ | ---------- | -------- | ---------- | ------- |
+| **OpenAI Whisper** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | $0.006/min | ❌      |
+| SpeechBrain        | ⭐⭐⭐     | ⭐⭐     | Free       | ✅      |
+| Browser Speech     | ⭐⭐⭐     | ⭐⭐⭐⭐ | Free       | ✅      |
+| Google Speech      | ⭐⭐⭐⭐   | ⭐⭐⭐⭐ | Free       | ❌      |
