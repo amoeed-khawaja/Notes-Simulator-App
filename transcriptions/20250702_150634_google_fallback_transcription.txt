@@ -1,0 +1,8 @@
+Audio Format: wav
+Audio Size: 742476 bytes
+Transcription Service: google_fallback
+Transcription Time: 2025-07-02T15:06:34.236134
+Word Count: 11
+Character Count: 53
+Transcription:
+hello kaise hain bhai jaan aap laga raha hai Magar Tu

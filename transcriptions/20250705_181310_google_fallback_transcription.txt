@@ -1,0 +1,8 @@
+Audio Format: wav
+Audio Size: 468616 bytes
+Transcription Service: google_fallback
+Transcription Time: 2025-07-05T18:13:10.273965
+Word Count: 3
+Character Count: 16
+Transcription:
+hello hello 1965

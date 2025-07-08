@@ -1,0 +1,8 @@
+Audio Format: wav
+Audio Size: 641046 bytes
+Transcription Service: google_fallback
+Transcription Time: 2025-07-06T13:17:40.147201
+Word Count: 3
+Character Count: 20
+Transcription:
+totally totally 9290

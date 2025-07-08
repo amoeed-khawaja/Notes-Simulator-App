@@ -1,0 +1,8 @@
+Session ID: test_session_1750741940
+Confidence: 0.95
+Service: Browser Speech Recognition
+Transcription Time: 2025-06-24T10:12:22.957392
+Word Count: 12
+Character Count: 76
+Transcription:
+Hello, this is a test transcription from the browser speech recognition API.

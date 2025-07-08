@@ -1,0 +1,8 @@
+Session ID: simulation_session_1750741947
+Confidence: 0.92
+Service: Browser Speech Recognition
+Transcription Time: 2025-06-24T10:12:29.172709
+Word Count: 6
+Character Count: 32
+Transcription:
+Hello, this is the first phrase.

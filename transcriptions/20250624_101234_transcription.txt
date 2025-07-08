@@ -1,0 +1,8 @@
+Session ID: simulation_session_1750741947
+Confidence: 0.96
+Service: Browser Speech Recognition
+Transcription Time: 2025-06-24T10:12:34.274627
+Word Count: 11
+Character Count: 59
+Transcription:
+And finally, this is the third phrase to complete our test.
