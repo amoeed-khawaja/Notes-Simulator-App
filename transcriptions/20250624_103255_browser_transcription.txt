@@ -1,8 +1,0 @@
-Session ID: speechbrain_test_session_1750743173
-Confidence: 0.95
-Service: Browser Speech Recognition
-Transcription Time: 2025-06-24T10:32:55.062636
-Word Count: 9
-Character Count: 61
-Transcription:
-This is a test transcription from browser speech recognition.

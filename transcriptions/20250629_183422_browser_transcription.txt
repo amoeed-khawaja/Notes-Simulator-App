@@ -1,8 +1,0 @@
-Session ID: session_1751203991575
-Confidence: 0
-Service: Browser Speech Recognition
-Transcription Time: 2025-06-29T18:34:22.753243
-Word Count: 6
-Character Count: 27
-Transcription:
-hello my friend how are you

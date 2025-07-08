@@ -1,8 +1,0 @@
-Audio Format: wav
-Audio Size: 1422058 bytes
-Transcription Service: google_fallback
-Transcription Time: 2025-07-05T18:14:03.850905
-Word Count: 6
-Character Count: 15
-Transcription:
-hello 1 9 6 5 4

@@ -1,8 +1,0 @@
-Audio Format: wav
-Audio Size: 263726 bytes
-Transcription Service: google_fallback
-Transcription Time: 2025-06-29T18:34:51.645622
-Word Count: 3
-Character Count: 20
-Transcription:
-good morning teacher

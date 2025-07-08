@@ -1,8 +1,0 @@
-Session ID: debug_test_session
-Confidence: 0.95
-Service: Browser Speech Recognition
-Transcription Time: 2025-06-27T22:32:22.864346
-Word Count: 8
-Character Count: 47
-Transcription:
-This is a test transcription from debug script.

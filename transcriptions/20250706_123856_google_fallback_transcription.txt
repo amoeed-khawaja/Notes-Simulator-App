@@ -1,8 +1,0 @@
-Audio Format: wav
-Audio Size: 677560 bytes
-Transcription Service: google_fallback
-Transcription Time: 2025-07-06T12:38:56.011775
-Word Count: 3
-Character Count: 16
-Transcription:
-Kaif halak Allah

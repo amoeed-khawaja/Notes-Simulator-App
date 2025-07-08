@@ -1,8 +1,0 @@
-Audio Format: wav
-Audio Size: 381828 bytes
-Transcription Service: google_fallback
-Transcription Time: 2025-06-29T19:36:21.740849
-Word Count: 8
-Character Count: 38
-Transcription:
-kya hal hai aapke Tiktok hai bhai jaan

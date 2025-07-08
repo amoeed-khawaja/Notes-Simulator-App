@@ -1,8 +1,0 @@
-Audio Format: wav
-Audio Size: 450298 bytes
-Transcription Service: google_fallback
-Transcription Time: 2025-07-02T22:31:46.834175
-Word Count: 7
-Character Count: 34
-Transcription:
-good morning how are you my friend

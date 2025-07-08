@@ -1,8 +1,0 @@
-Audio Format: wav
-Audio Size: 304298 bytes
-Transcription Service: google_fallback
-Transcription Time: 2025-06-29T18:34:30.664208
-Word Count: 6
-Character Count: 27
-Transcription:
-hello my friend how are you

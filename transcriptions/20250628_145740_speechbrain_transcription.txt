@@ -1,8 +1,0 @@
-Audio Format: wav
-Audio Size: 32044 bytes
-Transcription Service: speechbrain
-Transcription Time: 2025-06-28T14:57:40.681306
-Word Count: 1
-Character Count: 5
-Transcription:
-DON'T
