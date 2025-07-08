@@ -1,0 +1,8 @@
+Audio Format: wav
+Audio Size: 687704 bytes
+Transcription Service: google_fallback
+Transcription Time: 2025-07-07T12:27:52.509514
+Word Count: 2
+Character Count: 14
+Transcription:
+aloevera Kaise

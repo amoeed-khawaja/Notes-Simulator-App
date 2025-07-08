@@ -1,0 +1,8 @@
+Audio Format: wav
+Audio Size: 387472 bytes
+Transcription Service: google_fallback
+Transcription Time: 2025-07-02T19:15:19.084352
+Word Count: 6
+Character Count: 31
+Transcription:
+bilkul aap log quarter ko Kitna

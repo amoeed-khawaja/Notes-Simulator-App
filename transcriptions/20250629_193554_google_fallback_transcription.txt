@@ -1,0 +1,8 @@
+Audio Format: wav
+Audio Size: 417930 bytes
+Transcription Service: google_fallback
+Transcription Time: 2025-06-29T19:35:54.541799
+Word Count: 6
+Character Count: 35
+Transcription:
+hello hello good morning good night
