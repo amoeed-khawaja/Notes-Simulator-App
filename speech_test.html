@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech Recognition Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .controls {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .status.listening {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .transcript-container {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+            min-height: 200px;
+        }
+        .transcript-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+        .final-transcript {
+            color: #28a745;
+            font-size: 18px;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+        .interim-transcript {
+            color: #6c757d;
+            font-style: italic;
+            font-size: 16px;
+        }
+        .server-info {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .server-info h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 2px 0;
+        }
+        .log-entry.info { color: #007bff; }
+        .log-entry.success { color: #28a745; }
+        .log-entry.error { color: #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Browser Speech Recognition Test</h1>
+        
+        <div class="server-info">
+            <h3>Server Status</h3>
+            <p>Flask Server: <span id="serverStatus">Checking...</span></p>
+            <p>Transcription Count: <span id="transcriptionCount">-</span></p>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" onclick="startRecognition()">🎤 Start Recognition</button>
+            <button id="stopBtn" onclick="stopRecognition()" disabled>🛑 Stop Recognition</button>
+            <button id="saveBtn" onclick="saveTranscription()" disabled>💾 Save to Server</button>
+            <button id="clearBtn" onclick="clearTranscript()">🗑️ Clear</button>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div class="transcript-container">
+            <div class="transcript-title">📝 Live Transcription:</div>
+            <div id="finalTranscript" class="final-transcript"></div>
+            <div id="interimTranscript" class="interim-transcript"></div>
+        </div>
+
+        <div class="log">
+            <div class="transcript-title">📋 Activity Log:</div>
+            <div id="logContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        let recognition;
+        let finalTranscript = '';
+        let interimTranscript = '';
+        let isListening = false;
+        const FLASK_SERVER_URL = 'http://localhost:5000';
+
+        // Initialize speech recognition
+        function initSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = 'en-US';
+
+                recognition.onstart = () => {
+                    log('Speech recognition started', 'info');
+                    updateStatus('Listening...', 'listening');
+                    isListening = true;
+                    updateButtons();
+                };
+
+                recognition.onresult = (event) => {
+                    interimTranscript = '';
+                    let newFinalTranscript = '';
+
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcriptPart = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            newFinalTranscript += transcriptPart;
+                        } else {
+                            interimTranscript += transcriptPart;
+                        }
+                    }
+
+                    if (newFinalTranscript) {
+                        finalTranscript += newFinalTranscript;
+                        log(`Final transcript: "${newFinalTranscript}"`, 'success');
+                    }
+
+                    updateDisplay();
+                };
+
+                recognition.onerror = (event) => {
+                    log(`Speech recognition error: ${event.error}`, 'error');
+                    updateStatus(`Error: ${event.error}`, 'error');
+                    isListening = false;
+                    updateButtons();
+                };
+
+                recognition.onend = () => {
+                    log('Speech recognition ended', 'info');
+                    updateStatus('Stopped', '');
+                    isListening = false;
+                    updateButtons();
+                };
+
+                return true;
+            } else {
+                log('Speech recognition not supported in this browser', 'error');
+                updateStatus('Speech recognition not supported', 'error');
+                return false;
+            }
+        }
+
+        function startRecognition() {
+            if (!recognition) {
+                if (!initSpeechRecognition()) {
+                    return;
+                }
+            }
+
+            try {
+                recognition.start();
+                log('Starting speech recognition...', 'info');
+            } catch (error) {
+                log(`Error starting recognition: ${error}`, 'error');
+            }
+        }
+
+        function stopRecognition() {
+            if (recognition && isListening) {
+                recognition.stop();
+                log('Stopping speech recognition...', 'info');
+            }
+        }
+
+        function updateDisplay() {
+            document.getElementById('finalTranscript').textContent = finalTranscript;
+            document.getElementById('interimTranscript').textContent = interimTranscript;
+        }
+
+        function updateStatus(message, className) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${className}`;
+        }
+
+        function updateButtons() {
+            document.getElementById('startBtn').disabled = isListening;
+            document.getElementById('stopBtn').disabled = !isListening;
+            document.getElementById('saveBtn').disabled = !finalTranscript.trim();
+        }
+
+        function clearTranscript() {
+            finalTranscript = '';
+            interimTranscript = '';
+            updateDisplay();
+            updateButtons();
+            log('Transcript cleared', 'info');
+        }
+
+        function log(message, type = 'info') {
+            const logContainer = document.getElementById('logContainer');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        async function saveTranscription() {
+            if (!finalTranscript.trim()) {
+                log('No transcription to save', 'error');
+                return;
+            }
+
+            try {
+                log('Saving transcription to server...', 'info');
+                
+                const response = await fetch(`${FLASK_SERVER_URL}/save-transcription`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        transcription: finalTranscript.trim(),
+                        session_id: `web_session_${Date.now()}`,
+                        confidence: 0.95,
+                        timestamp: new Date().toISOString()
+                    }),
+                });
+
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    log(`Transcription saved successfully! Words: ${data.word_count}, Characters: ${data.character_count}`, 'success');
+                    updateServerInfo();
+                } else {
+                    log(`Failed to save transcription: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`Error saving transcription: ${error}`, 'error');
+            }
+        }
+
+        async function updateServerInfo() {
+            try {
+                const response = await fetch(`${FLASK_SERVER_URL}/health`);
+                const data = await response.json();
+                
+                document.getElementById('serverStatus').textContent = data.status;
+                document.getElementById('transcriptionCount').textContent = data.transcription_count;
+            } catch (error) {
+                document.getElementById('serverStatus').textContent = 'Offline';
+                document.getElementById('transcriptionCount').textContent = '-';
+            }
+        }
+
+        // Initialize on page load
+        window.onload = function() {
+            log('Page loaded, initializing speech recognition...', 'info');
+            initSpeechRecognition();
+            updateServerInfo();
+            
+            // Update server info every 10 seconds
+            setInterval(updateServerInfo, 10000);
+        };
+    </script>
+</body>
+</html> 
